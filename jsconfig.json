@@ -1,0 +1,12 @@
+{
+	"compilerOptions": {
+		"experimentalDecorators": true,
+		"jsxImportSource": "react",
+		"module": "es6",
+		"moduleResolution": "node",
+		"target": "es6",
+		"allowSyntheticDefaultImports": true
+	},
+	"include": ["./src/**/*", "./static/**/*"],
+	"exclude": ["./.cache/**/*", "./.netlify/**/*", "./.vscode/**/*", "./node_modules/**/*", "./public/**/*"]
+}

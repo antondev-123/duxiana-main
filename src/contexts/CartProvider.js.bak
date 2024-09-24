@@ -1,0 +1,393 @@
+import { createContext, useEffect, useState } from "react";
+import { useSetCustomerData, useSetLogout } from "../hooks/useAuth";
+import { useGetCartId, useSetCartId } from "../hooks/useCart";
+import { createCart, updateCustomerId } from "../services/bigcommerce/carts/cart";
+import { addCartLineItems, deleteCartLineItem, updateCartLineItem } from "../services/bigcommerce/carts/cart-items";
+import { createCartRedirectUrl } from "../services/bigcommerce/carts/cart-redirect-items";
+import { getCheckout } from "../services/bigcommerce/checkouts/checkout";
+import {
+	addConsignmentToCheckout,
+	updateCheckoutConsignment
+} from "../services/bigcommerce/checkouts/checkout-consignments";
+import { addCouponToCheckout, deleteCheckoutCoupon } from "../services/bigcommerce/checkouts/checkout-coupons";
+import { validatePassword } from "../services/bigcommerce/customers/v2/customer-passwords";
+import { createCustomers, getAllCustomers } from "../services/bigcommerce/customers/v3/customers";
+import notification from "../utils/notification";
+import { checkForNullOrUndefined } from "../utils/nullUndefinedCheck";
+
+const CartContext = createContext();
+
+const initialState = {
+	addingToCart: 0,
+	loading: false,
+	id: 0,
+	updatingItem: 0,
+	checkoutUrl: null
+};
+
+export const CartProvider = ({ children }) => {
+	const [state, setState] = useState(initialState);
+
+	useEffect(() => {
+		loadCheckout();
+	}, []);
+
+	/**
+	 * @description Fetch the checkout information from the server
+	 * @param {string} checkoutId
+	 * @returns {Promise<void>} The promise of the fetch
+	 */
+	const fetchCheckout = async (checkoutId) => {
+		let result = await getCheckout({ checkoutId });
+
+		return result.status === "success" ? refreshCheckout(result.data) : setState({ ...state, loading: false });
+	};
+
+	/**
+	 * @description Refresh the checkout information from the server
+	 * @param {Object} data
+	 * @returns {Promise<void>} The promise of the fetch
+	 */
+	const refreshCheckout = (data) =>
+		setState({
+			...state,
+			loading: false,
+			...data.data
+		});
+
+	const loadCheckout = () => {
+		let cartId = useGetCartId();
+		let checkedCartId = checkForNullOrUndefined(cartId);
+
+		if (checkedCartId) {
+			setState({ ...state, loading: true });
+			fetchCheckout(checkedCartId);
+		}
+	};
+	/**
+	 * Handle refreshing cart information
+	 *
+	 * @param {Object} response
+	 */
+	const refreshCart = (cartData) => {
+		setState({
+			...state,
+			loading: false,
+			cart: {
+				...cartData
+			}
+		});
+	};
+
+	/**
+	 * @description Add to cart
+	 * @param {Array} line_item
+	 * @returns {Promise<void>} The promise of the fetch
+	 */
+	const addToCart = async (line_item) => {
+		let line_items = [],
+			result = {},
+			cartId = checkForNullOrUndefined(state.id),
+			channelId = null;
+
+		line_items.push(line_item);
+
+		setState({ ...state, addingToCart: line_item.product_id });
+
+		if (!cartId) {
+			result = await createCart({ lineItems: line_items, channelId });
+		} else {
+			result = await addCartLineItems({ cartId, lineItems: line_items });
+		}
+
+		return result.status === "success"
+			? (() => {
+					let checkoutId = result.data.data.id;
+
+					setState({
+						...state,
+						id: checkoutId
+					});
+
+					useSetCartId(checkoutId);
+					fetchCheckout(checkoutId);
+					notification("Item added to cart!", "success");
+			  })()
+			: (() => {
+					setState({ ...state, loading: false });
+					notification("Item could not be added to cart!", "error");
+			  })();
+	};
+
+	/**
+	 * @description Update an item in the cart
+	 * @param {string} itemId
+	 * @param {string} data
+	 * @returns {Promise<void>} The promise of the fetch
+	 */
+	const updateItemInCart = async (itemId, data) => {
+		let cartId = state.id,
+			result = await updateCartLineItem({ cartId, itemId, lineItem: data });
+
+		return result.status === "success"
+			? (() => {
+					fetchCheckout(cartId);
+					notification("Quantity changed.", "success");
+			  })()
+			: notification("Quantity could not be changed.", "error");
+	};
+
+	/**
+	 * @description Remove an item from the cart
+	 * @param {string} itemId
+	 * @returns {Promise<void>} The promise of the fetch
+	 */
+	const removeItemFromCart = async (itemId) => {
+		let cartId = state.id,
+			result = await deleteCartLineItem({ cartId, itemId });
+
+		return result.status === "success"
+			? (() => {
+					let checkedResultData = checkForNullOrUndefined(result.data);
+
+					checkedResultData
+						? (() => {
+								fetchCheckout(cartId);
+								notification("Item removed from cart.", "success");
+						  })()
+						: (() => {
+								useSetCartId(null);
+								setState(initialState);
+						  })();
+			  })()
+			: notification("Item could not be removed from cart.", "error");
+	};
+
+	/**
+	 * @description Update the cart item quantity
+	 * @param {Object} item
+	 * @param {string} action
+	 * @returns {Promise<void>} The promise of the fetch
+	 */
+	const updateCartItemQuantity = async (item, action) => {
+		let newQuantity = item.quantity + (action === "minus" ? -1 : 1);
+
+		setState({ ...state, updatingItem: item.id });
+
+		if (newQuantity < 1) {
+			return removeItemFromCart(item.id);
+		}
+
+		updateItemInCart(item.id, {
+			...item,
+			quantity: newQuantity
+		});
+	};
+
+	/**
+	 * @description Add a coupon to the cart
+	 * @param {string} code
+	 * @returns {Promise<void>} The promise of the fetch
+	 */
+	const addCouponCode = async (code) => {
+		let checkoutId = state.id,
+			result = await addCouponToCheckout({ checkoutId, couponCode: code });
+
+		result.status === "success"
+			? (() => {
+					refreshCheckout(result.data);
+					notification("Coupon is added to Checkout.", "success");
+			  })()
+			: result.status === "failed"
+			? notification("Invalid coupon inputed.", "error")
+			: notification("Coupon could not be added to Checkout.", "error");
+	};
+
+	/**
+	 * @description Remove a coupon from the cart
+	 * @param {string} code
+	 * @returns {Promise<void>} The promise of the fetch
+	 */
+	const removeCouponCode = async (code) => {
+		let checkoutId = state.id,
+			result = await deleteCheckoutCoupon({ checkoutId, couponCode: code });
+
+		return result.status === "success"
+			? (() => {
+					refreshCheckout(result.data);
+					notification("Coupon is removed.", "success");
+			  })()
+			: notification("Coupon could not be removed.", "error");
+	};
+
+	/**
+	 * @description Create checkout URL
+	 * @returns {string} The checkout URL
+	 */
+	const createCheckoutUrl = async () => {
+		let cartId = state.id,
+			result = await createCartRedirectUrl({ cartId });
+
+		return result.status === "success"
+			? (() => {
+					setState({
+						...state,
+						checkoutUrl: result.data.data.embedded_checkout_url
+					});
+			  })()
+			: notification("Can't create checkout url", "error");
+	};
+
+	/**
+	 * @description Fetch the checkout line items
+	 * @returns {Promise<void>} The promise of the fetch
+	 */
+	const getCheckoutLineItems = () => {
+		let lineItems = [];
+
+		for (const item of state.cart.line_items.physical_items) {
+			lineItems.push({
+				quantity: item.quantity,
+				item_id: item.id
+			});
+		}
+
+		for (const item of state.cart.line_items.gift_certificates) {
+			lineItems.push({
+				quantity: item.quantity,
+				item_id: item.id
+			});
+		}
+
+		for (const item of state.cart.line_items.digital_items) {
+			lineItems.push({
+				quantity: item.quantity,
+				item_id: item.id
+			});
+		}
+
+		for (const item of state.cart.line_items.custom_items) {
+			lineItems.push({
+				quantity: item.quantity,
+				item_id: item.id
+			});
+		}
+
+		return lineItems;
+	};
+
+	/**
+	 * @description Add consignment checkout
+	 * @param {*} address
+	 * @returns {Promise<void>} The promise of the fetch
+	 */
+	const addConsignmentCheckout = async (address) => {
+		let checkoutId = state.id,
+			lineItems = getCheckoutLineItems(),
+			result = await addConsignmentToCheckout({ checkoutId, address, lineItems });
+
+		return result.status === "success"
+			? (() => {
+					refreshCheckout(result.data);
+			  })()
+			: notification("Consignment could not be added to Checkout.", "error");
+	};
+
+	const updateConsignmentCheckout = (shipping_option_id) =>
+		state?.consignments?.length > 0
+			? (async () => {
+					let checkoutId = state.id,
+						consignmentId = state?.consignments[0].id,
+						result = await updateCheckoutConsignment({
+							checkoutId,
+							consignmentId,
+							shippingOptionId: shipping_option_id
+						});
+
+					return result.status === "success"
+						? (() => {
+								refreshCheckout(result.data);
+								return true;
+						  })()
+						: notification("Consignment could not be updated.", "error");
+			  })()
+			: notification("Consignment could not be updated.", "error");
+
+	const setCustomer = async (customerData, remember) => {
+		const customerId = customerData.id;
+		if (remember) useSetCustomerData(customerData);
+		setState({ ...state, customerId });
+		let cartId = state.id;
+		if (cartId != null) {
+			let result = await updateCustomerId({ cartId, customerId });
+
+			if (result.status === "success") {
+				refreshCart(result.data.data);
+				return true;
+			} else {
+				return false;
+			}
+		}
+	};
+
+	const login = async (email, password, remember) => {
+		const response = await getAllCustomers({ emailIn: email });
+		if (response.status == "success") {
+			const customerList = response.data.data;
+			if (customerList.length != 0) {
+				const customerData = customerList[0];
+				const customerId = customerData.id;
+				const res = await validatePassword({ customerId, password });
+				if (res.status == "success" && res.data.success) {
+					await setCustomer(customerData, remember);
+					return true;
+				} else {
+					return false;
+				}
+			} else {
+				return false;
+			}
+		} else {
+			return false;
+		}
+	};
+
+	const logout = async () => {
+		useSetLogout();
+		setCustomer(null);
+	};
+
+	const register = async (customer) => {
+		const res = await createCustomers(customer);
+		if (res.status == "success") {
+			setCustomer(res.data.data[0]);
+			return true;
+		} else {
+			return false;
+		}
+	};
+
+	return (
+		<CartContext.Provider
+			value={{
+				state,
+				addToCart,
+				createCheckoutUrl,
+				updateItemInCart,
+				removeItemFromCart,
+				updateCartItemQuantity,
+				addCouponCode,
+				removeCouponCode,
+				addConsignmentCheckout,
+				updateConsignmentCheckout,
+				login,
+				register,
+				logout
+			}}
+		>
+			{children}
+		</CartContext.Provider>
+	);
+};
+
+export default CartContext;

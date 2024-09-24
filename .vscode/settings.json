@@ -1,0 +1,27 @@
+{
+	"editor.formatOnSave": true,
+	"editor.formatOnSaveMode": "modifications",
+	"eslint.format.enable": true,
+	"eslint.lintTask.enable": true,
+	"eslint.packageManager": "yarn",
+	"eslint.run": "onSave",
+	"eslint.options": {
+		"overrideConfig": {
+			"parser": "@babel/eslint-parser"
+		}
+	},
+	"prettier.configPath": ".prettierrc",
+	"prettier.enable": true,
+	"editor.codeActionsOnSave": {
+		"source.fixAll.prettier": true,
+		"source.fixAll.eslint": true,
+		"source.organizeImports": true
+	},
+	"tailwindCSS.emmetCompletions": true,
+	"tailwindCSS.colorDecorators": true,
+	"tailwindCSS.validate": true,
+	"typescript.validate.enable": false,
+	"typescript.format.enable": false,
+	"scss.validate": true,
+	"prettier.requireConfig": true
+}

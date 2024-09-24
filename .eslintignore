@@ -1,0 +1,7 @@
+# Map file extensions
+*.map
+
+# Folders
+.cache/
+.netlify/
+public/
