@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="41.58" height="42" viewBox="0 0 41.58 42">
+	<defs>
+		<style type="text/css">
+			.cls-1 {
+				fill:none;
+				stroke:#fff;
+				stroke-linecap:round;
+				stroke-linejoin:round;
+				stroke-width:2.7px;
+			}
+</style>
+	</defs>
+	<g id="Layer_2" data-name="Layer 2">
+		<g id="Icons">
+			<path class="cls-1" d="M16,22.21h9.52a15,15,0,0,1,15,15V39a2,2,0,0,1-2,2H3a2,2,0,0,1-2-2V37.24a15,15,0,0,1,15-15Z" />
+			<circle class="cls-1" cx="20.79" cy="11.6" r="10.6" transform="translate(-1.5 3.24) rotate(-8.61)" />
+		</g>
+	</g>
+</svg>

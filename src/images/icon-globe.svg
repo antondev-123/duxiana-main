@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="15.2" height="15.2" viewBox="0 0 15.2 15.2">
+  <g id="globe" transform="translate(-1.4 -1.4)">
+    <circle id="Ellipse_5" data-name="Ellipse 5" cx="7" cy="7" r="7" transform="translate(2 2)" stroke-width="1.2" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+    <line id="Line_20" data-name="Line 20" x2="14" transform="translate(2 9)" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" />
+    <path id="Path_34" data-name="Path 34" d="M10.8,2a10.71,10.71,0,0,1,2.8,7,10.71,10.71,0,0,1-2.8,7A10.71,10.71,0,0,1,8,9,10.71,10.71,0,0,1,10.8,2Z" transform="translate(-1.8)" fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.2" />
+  </g>
+</svg>
